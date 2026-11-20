@@ -39,16 +39,11 @@ fixed Ansible role, and two end-to-end suites tell you when you are done.
 
 ## How it fits
 
-```mermaid
-flowchart LR
-  T([Tenant order]) --> O[OSAC<br/>fulfillment + operator]
-  O -- "one automation job<br/>per operation" --> R[Contract role<br/>kypuros.fabric.manager<br/>20 tasks]
-  R -- "HTTPS / JSON<br/>bearer token" --> A[Fabric manager<br/>API v1]
-  A --> M[Reference backend<br/>emulated EVPN/VXLAN fabric]
-  A -.-> V[Your backend<br/>your switches, DPUs, array]
-  C[[Conformance suites<br/>+ 11 probes]] -. drive .-> O
-  C -. read .-> M
-```
+<p align="center">
+  <img alt="How the OSAC fabric manager fits: a tenant order goes through OSAC and an automation job to the contract role, which calls the fabric manager API; behind the API sits the reference backend or your own; conformance suites drive the order and read the equipment" src="docs/how-it-fits.png" width="900">
+</p>
+
+<p align="center"><sub>Source: <a href="docs/how-it-fits.excalidraw"><code>docs/how-it-fits.excalidraw</code></a>, editable at <a href="https://excalidraw.com">excalidraw.com</a>.</sub></p>
 
 | Layer | Where | What it is |
 |---|---|---|
