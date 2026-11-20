@@ -1,0 +1,1 @@
+snapshot of osac-sheldon fe0c021 (2026-11-07 evening: fabd with API v1, collection 1.0.3, both suites passed on v1)

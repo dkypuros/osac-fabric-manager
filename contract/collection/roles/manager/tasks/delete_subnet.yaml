@@ -1,0 +1,7 @@
+---
+# OSAC Fabric task `delete_subnet` (network contract OSAC-1433 §4.10) -> DELETE Subnet
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: DELETE
+    fabric_call_path: "/subnets/{{ osac_job_vars.resource.id }}"

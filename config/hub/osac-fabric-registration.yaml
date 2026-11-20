@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  ansible_role: kypuros.fabric.manager
+  capabilities: security_group_icmp
+  description: 'Sheldon lab: containerlab FRR EVPN/VXLAN fabric with BlueField-3 DPU
+    mimics, driven via fabd'
+  name: sheldon_fabric
+  network_types: evpn
+immutable: true
+kind: ConfigMap
+metadata:
+  labels:
+    osac.openshift.io/network-fabric-manager: 'true'
+  name: osac-network-fabric-manager-sheldon-fabric
+  namespace: osac

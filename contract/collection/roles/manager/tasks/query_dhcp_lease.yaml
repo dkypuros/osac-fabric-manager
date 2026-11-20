@@ -1,0 +1,28 @@
+---
+# OSAC Fabric task `query_dhcp_lease` (network contract OSAC-1433 §4.10) -> GET Attachment, Ready/Leased carries the lease.
+# Not leased yet -> retryable osac_error, so OSAC asks again (same behaviour as before).
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: GET
+    fabric_call_path: "/attachments/{{ osac_job_vars.target.id }}"
+- name: No lease yet
+  when: (fabric_response.status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='reason') | first | default('')) != 'Leased'
+  block:
+    - name: Report to OSAC that the lease is not there yet
+      ansible.builtin.set_stats:
+        aggregate: false
+        per_host: false
+        data:
+          osac_error:
+            message: "no active DHCP lease yet for {{ fabric_response.spec.mac | default('the attachment') }}: {{ fabric_response.status.conditions[0].message | default('') }}"
+            retryable: true
+    - name: Stop the job
+      ansible.builtin.fail:
+        msg: "no DHCP lease yet"
+- name: Return the result to OSAC
+  ansible.builtin.set_stats:
+    aggregate: false
+    per_host: false
+    data:
+      osac_result: "{{ {'dhcp_lease': {'ip_address': fabric_response.status.address, 'mac_address': fabric_response.spec.mac}} }}"

@@ -1,0 +1,12 @@
+---
+# OSAC Fabric task `create_security_group` (network contract OSAC-1433 §4.10) -> ACL
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/acls/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        vpc: "{{ osac_job_vars.virtual_network.id | default('') }}"
+        ingress: "{{ osac_job_vars.resource.spec.ingressRules | default([]) | list }}"
+        egress: "{{ osac_job_vars.resource.spec.egressRules | default([]) | list }}"

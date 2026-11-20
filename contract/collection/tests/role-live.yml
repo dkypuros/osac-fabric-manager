@@ -1,0 +1,102 @@
+---
+# Drives the contract role's tasks the way OSAC's playbooks do (osac_job_vars shaped like OSAC's), against a live
+# fabric manager. Run with run-live.sh, which supplies a fake server in a network namespace for the DHCP lease.
+# phase=create | lease | public | delete
+- hosts: localhost
+  gather_facts: false
+  vars:
+    ids:
+      vnet: rl-vnet
+      subnet: rl-subnet
+      sg: rl-sg
+      pool: rl-pool
+      eip: rl-eip
+      gw: rl-gw
+      bmi: rl-bmi
+      nat: rl-nat
+      natgw: rl-natgw
+      cluster: rl-cluster
+  tasks:
+    - name: Create (VPC, subnet, ACL, pool, external IPs, attachment)
+      when: phase == 'create'
+      block:
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_virtual_network}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.vnet }}", spec: {ipv4Cidr: 172.16.20.0/24}}, network_type: evpn}}
+        - debug: {msg: "vpc -> {{ fabric_status }} {{ fabric_response.status }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_subnet}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.subnet }}", spec: {ipv4Cidr: 172.16.20.0/24}}, virtual_network: {id: "{{ ids.vnet }}"}, network_type: evpn,
+                                 ipam: {gateway_ipv4: 172.16.20.1, physical_ipv4_cidrs: [172.16.20.128/26], lb_vip_ipv4_cidrs: [172.16.20.192/26]}}}
+        - debug: {msg: "subnet -> {{ fabric_status }} {{ fabric_response.status }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_security_group}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.sg }}", spec: {ingressRules: [{protocol: all, sourceCidr: 0.0.0.0/0}], egressRules: [{protocol: all, destinationCidr: 0.0.0.0/0}]}}, virtual_network: {id: "{{ ids.vnet }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_external_ip_pool}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.pool }}", spec: {cidrs: [203.0.113.0/24]}}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.eip }}", spec: {pool: "{{ ids.pool }}"}}}}
+        - debug: {msg: "eip -> {{ fabric_status }} {{ fabric_response.status.address }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.gw }}", spec: {pool: "{{ ids.pool }}"}}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: apply_network_attachment}
+          vars: {osac_job_vars: {target: {id: "{{ ids.bmi }}", host_name: bm-0, kind: BareMetalInstance},
+                                 network_attachment: {subnet: "{{ ids.subnet }}", interface: {type: physical, mac_address: "52:54:00:5e:2e:00"}, security_group_ids: ["{{ ids.sg }}"]}}}
+        - debug: {msg: "attachment -> {{ fabric_status }} {{ fabric_response.status.address }} {{ fabric_response.status.conditions[0].reason }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: apply_network_attachment}
+          vars: {osac_job_vars: {target: {id: "{{ ids.bmi }}", host_name: bm-0, kind: BareMetalInstance},
+                                 network_attachment: {subnet: "{{ ids.subnet }}", interface: {type: physical, mac_address: "52:54:00:5e:2e:00"}, security_group_ids: ["{{ ids.sg }}"]}}}
+        - debug: {msg: "attachment re-issued -> {{ fabric_status }} (expect 200)"}
+        - assert: {that: fabric_status | int == 200}
+
+    - name: Lease (query_dhcp_lease; fails retryably when the server has not asked yet)
+      when: phase == 'lease'
+      block:
+        - include_role: {name: kypuros.fabric.manager, tasks_from: query_dhcp_lease}
+          vars: {osac_job_vars: {target: {id: "{{ ids.bmi }}"}}}
+        - debug: {msg: "lease -> {{ fabric_response.status.address }} {{ fabric_response.spec.mac }}"}
+
+    - name: Public (NAT to the server, NAT gateway, cluster ingress reserve/release, provider_management NAT)
+      when: phase == 'public'
+      block:
+        - include_role: {name: kypuros.fabric.manager, tasks_from: attach_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.nat }}"}, external_ip: {id: "{{ ids.eip }}", address: unused-by-v1},
+                                 destination: {address: 172.16.20.129, routing_domain: {type: tenant_virtual_network, virtual_network_id: "{{ ids.vnet }}"}}}}
+        - debug: {msg: "nat -> {{ fabric_status }} {{ fabric_response.status }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: attach_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.nat }}-pm"}, external_ip: {id: "{{ ids.gw }}", address: unused-by-v1},
+                                 destination: {address: 10.251.0.250, routing_domain: {type: provider_management}}}}
+        - debug: {msg: "nat provider_management -> {{ fabric_status }} {{ fabric_response.status.routingDomain }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: detach_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.nat }}-pm"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: create_nat_gateway}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.natgw }}"}, virtual_network: {id: "{{ ids.vnet }}"}, external_ip: {id: "{{ ids.gw }}", address: unused-by-v1}}}
+        - debug: {msg: "natgw -> {{ fabric_status }} {{ fabric_response.status.address }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: reserve_cluster_ingress_ip}
+          vars: {osac_job_vars: {cluster_id: "{{ ids.cluster }}", subnet: {id: "{{ ids.subnet }}"}, ipam: {lb_vip_ipv4_cidrs: [172.16.20.192/26]}}}
+        - debug: {msg: "cluster ingress -> {{ fabric_status }} {{ fabric_response.status.address }}"}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: release_cluster_ingress_ip}
+          vars: {osac_job_vars: {cluster_id: "{{ ids.cluster }}"}}
+
+    - name: Delete, in OSAC's order (each must be 204; the second attachment delete too)
+      when: phase == 'delete'
+      block:
+        - include_role: {name: kypuros.fabric.manager, tasks_from: detach_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.nat }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_nat_gateway}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.natgw }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.eip }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_external_ip}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.gw }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_external_ip_pool}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.pool }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_network_attachment}
+          vars: {osac_job_vars: {target: {id: "{{ ids.bmi }}"}, network_attachment: {interface: {type: physical}}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_network_attachment}
+          vars: {osac_job_vars: {target: {id: "{{ ids.bmi }}"}, network_attachment: {interface: {type: physical}}}}
+        - debug: {msg: "attachment deleted twice -> {{ fabric_status }} (expect 204)"}
+        - assert: {that: fabric_status | int == 204}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_security_group}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.sg }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_subnet}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.subnet }}"}}}
+        - include_role: {name: kypuros.fabric.manager, tasks_from: delete_virtual_network}
+          vars: {osac_job_vars: {resource: {id: "{{ ids.vnet }}"}}}

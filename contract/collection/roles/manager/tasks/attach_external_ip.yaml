@@ -1,0 +1,27 @@
+---
+# OSAC Fabric task `attach_external_ip` (network contract OSAC-1433 §4.10) -> NAT
+# Routing domains: tenant_virtual_network (destination inside a tenant VRF) -> destination.kind attachment;
+# provider_management (destination on the hub network, e.g. a hosted cluster's API LoadBalancer) -> destination.kind providerManagement.
+- name: Only tenant and provider-management routing domains are supported
+  when: osac_job_vars.destination.routing_domain.type | default('') not in ['tenant_virtual_network', 'provider_management']
+  block:
+    - name: Report unsupported routing domain
+      ansible.builtin.set_stats:
+        aggregate: false
+        per_host: false
+        data: {osac_error: {message: "sheldon_fabric supports only tenant_virtual_network and provider_management destinations", retryable: false}}
+    - name: Stop
+      ansible.builtin.fail: {msg: unsupported routing domain}
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/nats/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        externalIp: "{{ osac_job_vars.external_ip.id }}"
+        destination: >-
+          {{ {'kind': 'providerManagement', 'address': osac_job_vars.destination.address}
+             if osac_job_vars.destination.routing_domain.type == 'provider_management' else
+             {'kind': 'attachment', 'address': osac_job_vars.destination.address,
+              'vpc': osac_job_vars.destination.routing_domain.virtual_network_id | default('')} }}

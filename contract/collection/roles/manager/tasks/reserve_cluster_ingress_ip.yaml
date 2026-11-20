@@ -1,0 +1,17 @@
+---
+# OSAC Fabric task `reserve_cluster_ingress_ip` (network contract OSAC-1433 §4.10) -> LoadBalancer
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/loadbalancers/{{ osac_job_vars.cluster_id }}"
+    fabric_call_body:
+      spec:
+        subnet: "{{ osac_job_vars.subnet.id }}"
+        lbVipCidrs: "{{ osac_job_vars.ipam.lb_vip_ipv4_cidrs | default([]) | list }}"
+- name: Return the result to OSAC
+  ansible.builtin.set_stats:
+    aggregate: false
+    per_host: false
+    data:
+      osac_result: "{{ {'cluster_ingress': {'address': fabric_response.status.address}} }}"

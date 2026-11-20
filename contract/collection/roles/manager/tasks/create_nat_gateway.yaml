@@ -1,0 +1,11 @@
+---
+# OSAC Fabric task `create_nat_gateway` (network contract OSAC-1433 §4.10) -> NATGateway
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/natgateways/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        vpc: "{{ osac_job_vars.virtual_network.id }}"
+        externalIp: "{{ osac_job_vars.external_ip.id }}"

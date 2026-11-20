@@ -1,0 +1,16 @@
+---
+# OSAC Fabric task `create_external_ip` (network contract OSAC-1433 §4.10) -> ExternalIP
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/externalips/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        pool: "{{ osac_job_vars.resource.spec.pool }}"
+- name: Return the result to OSAC
+  ansible.builtin.set_stats:
+    aggregate: false
+    per_host: false
+    data:
+      osac_result: "{{ {'external_ip': {'address': fabric_response.status.address}} }}"

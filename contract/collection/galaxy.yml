@@ -1,0 +1,8 @@
+namespace: kypuros
+name: fabric
+version: 1.0.3
+readme: readme.md
+authors: ["OSAC on Sheldon lab"]
+description: OSAC provider Fabric Manager (network contract OSAC-1433) for the Sheldon mimicked EVPN fabric (fabd).
+license: [Apache-2.0]
+dependencies: {}

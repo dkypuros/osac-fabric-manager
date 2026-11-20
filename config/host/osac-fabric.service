@@ -1,0 +1,17 @@
+[Unit]
+Description=OSAC lab: bring up mimicked fabric (containerlab) + host wiring + storage array
+After=network-online.target libvirtd.service podman.service
+Wants=network-online.target libvirtd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/student/src/osac-sheldon/fabric
+ExecStart=/usr/bin/containerlab deploy -t osacfab.clab.yml --runtime podman --reconfigure
+ExecStart=/bin/bash /home/student/src/osac-sheldon/fabric/host-up.sh
+ExecStart=-/usr/bin/virsh start storage-array
+ExecStart=/bin/systemctl restart osac-fabd osac-outside-dns osac-r53-sync osac-git
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

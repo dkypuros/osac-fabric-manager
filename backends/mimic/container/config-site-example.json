@@ -1,0 +1,78 @@
+{
+  "_comment": "Example of a site-shaped configuration for the dry run. Every value here is invented: documentation addresses, private AS numbers. Copy it, put in your own node names, AS numbers, loopbacks and VNI pools, and mount it at /config/config.json.",
+  "bind": "0.0.0.0",
+  "port": 7480,
+  "state_file": "/var/lib/osac-fabd/state.json",
+  "token_file": "/etc/osac-fabd/token",
+  "nodes": {
+    "border": {
+      "asn": 64512,
+      "lo": "192.0.2.1"
+    },
+    "dpu-0": {
+      "asn": 64513,
+      "lo": "192.0.2.3"
+    },
+    "dpu-st": {
+      "asn": 64514,
+      "lo": "192.0.2.4"
+    }
+  },
+  "border": "border",
+  "server_dpus": [
+    "dpu-0"
+  ],
+  "hosts": {
+    "server-1": {
+      "node": "dpu-0",
+      "port": "pf0vf0",
+      "snap_iface": "snap0"
+    }
+  },
+  "edge_nexthop": "192.168.254.0",
+  "border_uplink": "eth1",
+  "tenant_dns": "198.51.100.53",
+  "storage": {
+    "l3_vni": 30090,
+    "l2_vni": 31090,
+    "gateway": "192.168.250.1",
+    "prefixlen": 24,
+    "ports": {
+      "dpu-st": "eth2"
+    }
+  },
+  "array": {
+    "ssh": "dry-run",
+    "key": "/etc/osac-fabd/array_key",
+    "nqn_prefix": "nqn.2026-01.example.site:array",
+    "addr": "192.168.250.10",
+    "port": 4420
+  },
+  "hub": {
+    "port": "eth4",
+    "address": "10.251.0.2",
+    "cut_lifecycle_nic": true,
+    "allow": [
+      {
+        "prefix": "10.251.0.60/32",
+        "tcp": [
+          "443",
+          "30000-32767"
+        ]
+      }
+    ]
+  },
+  "edge": {
+    "node": "edge",
+    "internet_port": "eth0",
+    "block": [
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "100.64.0.0/10",
+      "169.254.0.0/16"
+    ]
+  },
+  "l3_vni_pool": "30001-30090",
+  "l2_vni_pool": "31001-31090"
+}

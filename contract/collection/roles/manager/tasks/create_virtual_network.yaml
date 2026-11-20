@@ -1,0 +1,18 @@
+---
+# OSAC Fabric task `create_virtual_network` (network contract OSAC-1433 §4.10) -> VPC
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/vpcs/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        cidr: "{{ osac_job_vars.resource.spec.ipv4Cidr }}"
+      metadata:
+        labels: {"osac.openshift.io/kind": "VirtualNetwork"}
+- name: Return the result to OSAC
+  ansible.builtin.set_stats:
+    aggregate: false
+    per_host: false
+    data:
+      osac_result: "{{ {'l3_vni': fabric_response.status.l3vni | int, 'backend_id': fabric_response.status.vrf} if (osac_job_vars.network_type | default('', true) | length > 0) else {'backend_id': fabric_response.status.vrf} }}"

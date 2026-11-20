@@ -1,0 +1,21 @@
+---
+# OSAC Fabric task `create_subnet` (network contract OSAC-1433 §4.10) -> Subnet
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/subnets/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        vpc: "{{ osac_job_vars.virtual_network.id }}"
+        cidr: "{{ osac_job_vars.resource.spec.ipv4Cidr }}"
+        gateway: "{{ osac_job_vars.ipam.gateway_ipv4 }}"
+        physicalCidrs: "{{ osac_job_vars.ipam.physical_ipv4_cidrs | default([]) | list }}"
+        lbVipCidrs: "{{ osac_job_vars.ipam.lb_vip_ipv4_cidrs | default([]) | list }}"
+- name: Return the result to OSAC
+  when: osac_job_vars.network_type | default('', true) | length > 0
+  ansible.builtin.set_stats:
+    aggregate: false
+    per_host: false
+    data:
+      osac_result: "{{ {'network_segment': {'type': osac_job_vars.network_type, 'l2_vni': fabric_response.status.l2vni | int}} }}"

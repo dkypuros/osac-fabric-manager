@@ -1,0 +1,12 @@
+# OSAC fabric manager (mimic backend) in dry-run: the API v1 answers, every device command is journalled, nothing is
+# touched. A stand-in for environments where the real fabric (BlueField-3 / SONiC) is not yet wired in.
+# Build from backends/mimic so the one copy of fabd.py is used:
+#   podman build -f container/Containerfile -t osac-fabd-dryrun .
+# A site's own shape (node names, AS numbers, VNI pools): mount it at /config/config.json; config-site-example.json shows the keys.
+FROM docker.io/library/python:3.12-alpine
+WORKDIR /app
+COPY fabd/fabd.py container/config-dryrun.json container/config-site-example.json container/entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh && mkdir -p /etc/osac-fabd /var/lib/osac-fabd && chown -R 1001:0 /etc/osac-fabd /var/lib/osac-fabd /app
+USER 1001
+EXPOSE 7480
+ENTRYPOINT ["/app/entrypoint.sh"]

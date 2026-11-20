@@ -1,0 +1,10 @@
+[Unit]
+Description=OSAC fabric agent (mimicked EVPN fabric, DPUs, NAT)
+After=network-online.target podman.service
+[Service]
+ExecStartPre=/home/student/src/osac-sheldon/fabric/host-up.sh
+ExecStart=/usr/bin/python3 /usr/local/sbin/osac-fabd
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

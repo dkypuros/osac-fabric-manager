@@ -1,0 +1,56 @@
+---
+# One call to the fabric manager's northbound API v1 (osac-fabric-manager docs/api.md).
+# Inputs: fabric_call_method (GET|PUT|PATCH|DELETE), fabric_call_path (under /v1), fabric_call_body (optional).
+# Output facts: fabric_response (the parsed JSON body, {} on 204), fabric_status (the HTTP status).
+# Any 2xx is success: 200 unchanged/changed, 201 created, 202 accepted but not Ready yet, 204 deleted or already gone.
+- name: Check the manager settings
+  when: (fabric_manager_url | length == 0) or (fabric_manager_token | length == 0)
+  block:
+    - name: Report the missing setting
+      ansible.builtin.set_stats:
+        aggregate: false
+        per_host: false
+        data:
+          osac_error:
+            message: "SHELDON_FABRIC_URL or SHELDON_FABRIC_TOKEN is not set in the network-fulfillment-ig ConfigMap/Secret"
+            retryable: true
+    - name: Stop the job
+      ansible.builtin.fail:
+        msg: "SHELDON_FABRIC_URL or SHELDON_FABRIC_TOKEN is not set"
+
+- name: Call the fabric manager {{ fabric_call_method }} /v1{{ fabric_call_path }}
+  ansible.builtin.uri:
+    url: "{{ fabric_manager_url }}/v1{{ fabric_call_path }}"
+    method: "{{ fabric_call_method }}"
+    headers:
+      Authorization: "Bearer {{ fabric_manager_token }}"
+    body_format: json
+    body: "{{ fabric_call_body | default(omit) }}"
+    status_code: [200, 201, 202, 204, 401, 404, 405, 409, 422, 500, 503]
+    timeout: 120
+  register: _fabric_http
+  no_log: true
+  ignore_errors: true
+
+- name: Handle a fabric manager failure
+  when: _fabric_http.status | default(-1) not in [200, 201, 202, 204]
+  block:
+    - name: Report the failure to OSAC
+      ansible.builtin.set_stats:
+        aggregate: false
+        per_host: false
+        data:
+          osac_error:
+            message: >-
+              {{ (_fabric_http.json.message | default('fabric manager unreachable at ' ~ fabric_manager_url))
+                 if (_fabric_http.json is defined and _fabric_http.json is mapping) else
+                 ('fabric manager unreachable at ' ~ fabric_manager_url ~ ' (status ' ~ (_fabric_http.status | default('none')) ~ ')') }}
+            retryable: "{{ (_fabric_http.json.retryable | default(true) | bool) if (_fabric_http.json is defined and _fabric_http.json is mapping) else true }}"
+    - name: Stop the job
+      ansible.builtin.fail:
+        msg: "fabric manager {{ fabric_call_method }} /v1{{ fabric_call_path }} failed (status {{ _fabric_http.status | default('none') }})"
+
+- name: Keep the response
+  ansible.builtin.set_fact:
+    fabric_response: "{{ _fabric_http.json | default({}) if (_fabric_http.json is defined and _fabric_http.json is mapping) else {} }}"
+    fabric_status: "{{ _fabric_http.status }}"

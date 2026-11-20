@@ -1,0 +1,3 @@
+# Settings follow the network contract convention: keys start with the registration name in upper case.
+fabric_manager_url: "{{ lookup('ansible.builtin.env', 'SHELDON_FABRIC_URL') }}"
+fabric_manager_token: "{{ lookup('ansible.builtin.env', 'SHELDON_FABRIC_TOKEN') }}"

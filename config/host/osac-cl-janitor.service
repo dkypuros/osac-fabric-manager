@@ -1,0 +1,14 @@
+[Unit]
+Description=OSAC cluster janitor: automatic workarounds for OSAC bugs 6 (worker public address) and 9 (deletion loop)
+After=network-online.target osac-fabd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=student
+ExecStart=/usr/bin/python3 /usr/local/sbin/osac-cl-janitor
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

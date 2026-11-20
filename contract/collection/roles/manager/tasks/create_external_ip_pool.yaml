@@ -1,0 +1,10 @@
+---
+# OSAC Fabric task `create_external_ip_pool` (network contract OSAC-1433 §4.10) -> Pool
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/pools/{{ osac_job_vars.resource.id }}"
+    fabric_call_body:
+      spec:
+        cidr: "{{ osac_job_vars.resource.spec.cidrs[0] }}"

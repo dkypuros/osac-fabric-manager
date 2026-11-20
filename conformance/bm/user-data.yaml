@@ -1,0 +1,22 @@
+#cloud-config
+# Emulated server NICs: enp1s0 = provisioning (ocnet, Metal3/Ironic), enp5s0 = DPU data port (tenant subnet).
+# On real hardware the provisioning port moves to the tenant network; here the VM keeps both, so the provisioning
+# NIC must not install a default route (replies to outside clients must go back through the border NAT).
+write_files:
+  - path: /etc/netplan/99-osac-nics.yaml
+    permissions: '0600'
+    content: |
+      network:
+        version: 2
+        ethernets:
+          provisioning:
+            match: {name: enp1s0}
+            dhcp4: true
+            dhcp4-overrides: {use-routes: false, use-dns: false}
+            optional: true   # plan 08: the fabric cuts this link after the port move; do not let wait-online block boot on it
+          data:
+            match: {name: enp5s0}
+            dhcp4: true
+runcmd:
+  - [rm, -f, /etc/netplan/50-cloud-init.yaml]
+  - [netplan, apply]

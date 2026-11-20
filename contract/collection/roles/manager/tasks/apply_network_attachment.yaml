@@ -1,0 +1,20 @@
+---
+# OSAC Fabric task `apply_network_attachment` (network contract OSAC-1433 §4.10) -> Attachment (DPU port into the subnet)
+# 201/200 = programmed; 202 = programmed, no DHCP lease yet (OSAC asks for the lease separately with query_dhcp_lease).
+- name: Overlay interfaces are a documented no-op (the Kubernetes Manager enforces VM policy)
+  when: osac_job_vars.network_attachment.interface.type != 'physical'
+  ansible.builtin.meta: end_play
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: PUT
+    fabric_call_path: "/attachments/{{ osac_job_vars.target.id }}"
+    fabric_call_body:
+      spec:
+        subnet: "{{ osac_job_vars.network_attachment.subnet }}"
+        host: "{{ osac_job_vars.target.host_name }}"
+        mac: "{{ osac_job_vars.network_attachment.interface.mac_address }}"
+        acls: "{{ osac_job_vars.network_attachment.security_group_ids | default([]) | list }}"
+      metadata:
+        labels:
+          osac.openshift.io/target: "{{ osac_job_vars.target.kind | default('BareMetalInstance') }}/{{ osac_job_vars.target.id }}"

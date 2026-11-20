@@ -1,0 +1,118 @@
+name: osacfab
+prefix: ""
+mgmt:
+  network: osacfab-mgmt
+  ipv4-subnet: 192.168.253.0/24
+topology:
+  defaults:
+    kind: linux
+    image: localhost/osac-dpu:1
+  nodes:
+    edge:
+      binds:
+        - configs/edge/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    border:
+      binds:
+        - configs/border/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    spine-1:
+      binds:
+        - configs/spine-1/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    spine-2:
+      binds:
+        - configs/spine-2/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    leaf-1:
+      binds:
+        - configs/leaf-1/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    leaf-2:
+      binds:
+        - configs/leaf-2/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    dpu-0:
+      binds:
+        - configs/dpu-0/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    dpu-1:
+      binds:
+        - configs/dpu-1/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+    dpu-st:
+      binds:
+        - configs/dpu-st/frr.conf:/etc/frr/frr.conf
+        - configs/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv4.tcp_l3mdev_accept=1
+        - sysctl -w net.ipv4.udp_l3mdev_accept=1
+  links:
+    - endpoints: ["edge:eth1", "border:eth1"]
+    - endpoints: ["border:eth2", "spine-1:eth1"]
+    - endpoints: ["border:eth3", "spine-2:eth1"]
+    - endpoints: ["spine-1:eth2", "leaf-1:eth1"]
+    - endpoints: ["spine-1:eth3", "leaf-2:eth1"]
+    - endpoints: ["spine-2:eth2", "leaf-1:eth2"]
+    - endpoints: ["spine-2:eth3", "leaf-2:eth2"]
+    - endpoints: ["leaf-1:eth3", "dpu-0:eth1"]
+    - endpoints: ["leaf-2:eth3", "dpu-1:eth1"]
+    - endpoints: ["leaf-2:eth4", "dpu-st:eth1"]
+    - endpoints: ["dpu-0:eth2", "host:dpu0-host"]
+    - endpoints: ["dpu-0:eth3", "host:dpu0-snap"]
+    - endpoints: ["dpu-1:eth2", "host:dpu1-host"]
+    - endpoints: ["dpu-1:eth3", "host:dpu1-snap"]
+    - endpoints: ["dpu-st:eth2", "host:dpust-arr"]
+    - endpoints: ["edge:eth2", "host:edge-out"]
+    - endpoints: ["border:eth4", "host:border-oc"]

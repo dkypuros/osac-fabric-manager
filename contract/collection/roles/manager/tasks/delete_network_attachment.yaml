@@ -1,0 +1,10 @@
+---
+# OSAC Fabric task `delete_network_attachment` (network contract OSAC-1433 §4.10) -> DELETE Attachment (204 also when gone)
+- name: Overlay interfaces are a documented no-op (the Kubernetes Manager enforces VM policy)
+  when: osac_job_vars.network_attachment.interface.type != 'physical'
+  ansible.builtin.meta: end_play
+- name: Call the fabric manager
+  ansible.builtin.include_tasks: _call.yaml
+  vars:
+    fabric_call_method: DELETE
+    fabric_call_path: "/attachments/{{ osac_job_vars.target.id }}"
