@@ -24,7 +24,7 @@
 ---
 
 OSAC orders servers, clusters and networks for tenants, and leaves isolation on the wire to a *fabric manager*
-that implements its provider network contract. This project is an open one. It shows that OSAC, driven by
+that implements its provider network contract. This repository provides an open implementation. It shows that OSAC, driven by
 Ansible Automation Platform, extends to whatever network equipment you bring: you implement one API below a
 fixed Ansible role, and two end-to-end suites tell you when you are done.
 
@@ -37,13 +37,13 @@ fixed Ansible role, and two end-to-end suites tell you when you are done.
 - **Tested end to end.** Both suites drive OSAC through its public API as a tenant, check every component on
   the path, tear down, and finish with a leak check.
 
-## How it fits
+## Architecture
 
 <p align="center">
-  <img alt="How the OSAC fabric manager fits: a tenant order goes through OSAC and an automation job to the contract role, which calls the fabric manager API; behind the API sits the reference backend or your own; conformance suites drive the order and read the equipment" src="docs/how-it-fits.png" width="900">
+  <img alt="OSAC fabric manager architecture: a tenant order goes through OSAC and an automation job to the contract role, which calls the fabric manager API; behind the API sits the reference backend or a vendor backend; conformance suites drive the order and read the equipment" src="docs/architecture.png" width="900">
 </p>
 
-<p align="center"><sub>Source: <a href="docs/how-it-fits.excalidraw"><code>docs/how-it-fits.excalidraw</code></a>, editable at <a href="https://excalidraw.com">excalidraw.com</a>.</sub></p>
+<p align="center"><sub>Source: <a href="docs/architecture.excalidraw"><code>docs/architecture.excalidraw</code></a>, editable at <a href="https://excalidraw.com">excalidraw.com</a>.</sub></p>
 
 | Layer | Where | What it is |
 |---|---|---|
@@ -53,7 +53,7 @@ fixed Ansible role, and two end-to-end suites tell you when you are done.
 | Conformance | [`conformance/`](conformance) | Suite BM (bare metal, 41 steps), Suite CL (hosted cluster, 36 steps), the probe interface |
 | Vendor guide | [`vendors/`](vendors/readme.md) | How to bring real equipment: each API object as an obligation on your gear, and the order of proof |
 
-## Try it in a minute
+## Quick start
 
 The API's semantics can be checked with no devices and no OSAC. This starts the reference backend in dry-run
 mode, plays a full cluster-order sequence through it, and verifies creation, idempotent re-puts, pending then
@@ -68,7 +68,7 @@ python3 dryrun_v1.py        # needs only Python 3; ends with "PASS: 0 failed che
 Point the same harness at your own backend with `--target <url> --token <token>`
 ([docs/conformance-harness.md](docs/conformance-harness.md)).
 
-## Bring your own equipment
+## Integrating your equipment
 
 1. Read [`docs/api.md`](docs/api.md): what must be true on the equipment when each object is `Ready`.
 2. Write a backend that serves API v1 against your switches, DPUs, border and storage. The reference backend in
