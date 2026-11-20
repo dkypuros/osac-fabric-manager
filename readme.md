@@ -1,67 +1,129 @@
-# osac-fabric-manager
+<h1 align="center">OSAC Fabric Manager</h1>
 
-An **OSAC Fabric Manager that is not Netris**: an implementation of OSAC's provider-owned network contract
-(OSAC-1433) where the enforcement point is the server's DPU (BlueField-3 style), the fabric is BGP EVPN/VXLAN,
-north-south is NAT at a border leaf, and storage is presented to servers the SNAP way. It comes with a one-box
-staging backend (a mimicked fabric) and conformance test suites that check every component along the path.
+<p align="center">
+  <strong>An open fabric manager for the <a href="https://github.com/osac-project">Open Sovereign AI Cloud</a>.</strong><br>
+  Bare-metal tenant isolation enforced on the server's DPU, over a BGP EVPN/VXLAN fabric,<br>
+  behind a declarative API that any equipment vendor can implement.
+</p>
 
-**Working name.** `osac-fabric-manager` is a placeholder until the project is named for the OEM that ships it.
-The name registered inside OSAC today is `sheldon_fabric` (see [docs/naming.md](docs/naming.md): the
-NetworkClass that refers to it cannot be changed after creation, so the real name should be chosen early).
+<p align="center">
+  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
+  <a href="docs/contract.md"><img alt="OSAC contract: OSAC-1433" src="https://img.shields.io/badge/OSAC%20contract-OSAC--1433-0d9488"></a>
+  <a href="docs/api.md"><img alt="API: v1" src="https://img.shields.io/badge/API-v1-3b82f6"></a>
+  <a href="contract/collection"><img alt="Ansible collection: kypuros.fabric 1.0.3" src="https://img.shields.io/badge/ansible%20collection-kypuros.fabric%201.0.3-ee0000?logo=ansible&logoColor=white"></a>
+  <img alt="Python 3, standard library only" src="https://img.shields.io/badge/python-3%20%C2%B7%20stdlib%20only-3776ab?logo=python&logoColor=white">
+</p>
+<p align="center">
+  <a href="docs/conformance.md"><img alt="Suite BM: 41 of 41, three passes" src="https://img.shields.io/badge/Suite%20BM-41%2F41%20%C3%97%203-success"></a>
+  <a href="conformance/reports"><img alt="Suite CL: 36 of 36, three passes" src="https://img.shields.io/badge/Suite%20CL-36%2F36%20%C3%97%203-success"></a>
+  <a href="docs/conformance-harness.md"><img alt="API semantics: 46 checks" src="https://img.shields.io/badge/API%20semantics-46%20checks-success"></a>
+  <img alt="Fabric: BGP EVPN/VXLAN" src="https://img.shields.io/badge/fabric-BGP%20EVPN%20%2F%20VXLAN-6b7280">
+  <img alt="Reference backend: emulated fabric" src="https://img.shields.io/badge/reference%20backend-emulated%20fabric-f59e0b">
+</p>
 
-**Status (2026-11-07, evening).** Proven on the Sheldon lab for bare metal (Suite BM, 3 × 41/41) and clusters
-(Suite CL, 3 × 36/36), both with the contract role calling the manager's own API v1. The lab still *runs* from the operational repo
-`osac-sheldon`; this repo is a curated snapshot of the fabric-manager pieces (`source-snapshot.txt` names the
-commit) plus the documentation that describes them as one thing. Switching the lab to run from here is a later
-step.
+---
 
-## How this repo relates to the others
-| Repo | Role |
-|---|---|
-| `osac-sheldon` | the operational log: what was built, what broke, how it was fixed, how to rebuild the whole lab |
-| `osac-walkthrough` | the demo: click-by-click follow-along with screenshots |
-| `osac` (fork) | OSAC's source with the lab's small changes and the list of upstream bugs |
-| **this repo** | the fabric manager as a product-shaped thing: contract, backends, shims, conformance |
+OSAC orders servers, clusters and networks for tenants, and leaves isolation on the wire to a *fabric manager*
+that implements its provider network contract. This project is an open one. It shows that OSAC, driven by
+Ansible Automation Platform, extends to whatever network equipment you bring: you implement one API below a
+fixed Ansible role, and two end-to-end suites tell you when you are done.
 
-## Bringing it to real equipment
-A vendor replaces the mimic below the API and fills in eleven read-only probes so the suites can look at their
-equipment; nothing above the API changes. Start at [vendors/readme.md](vendors/readme.md); the Dell guide
-([vendors/dell/readme.md](vendors/dell/readme.md)) walks a lab that already has BlueField-3, SONiC, iDRAC and
-PowerStore from a proven tenant floor to OSAC placing clusters in it.
+- **DPU-centric.** The tunnel endpoint, the security group, DHCP and storage presentation sit on the server's
+  DPU (BlueField-3 style). Leaf and spine switches are plain IP routers with no tenant state.
+- **Declarative and idempotent.** `PUT` the desired object, read back `status`. A repeated call is a no-op and a
+  delete of something already gone succeeds, so a retrying orchestrator converges.
+- **Replaceable below the API.** The contract role and the tests never touch a device. A vendor supplies a
+  backend and eleven read-only probes; nothing above the API changes.
+- **Tested end to end.** Both suites drive OSAC through its public API as a tenant, check every component on
+  the path, tear down, and finish with a leak check.
 
-## The three layers
+## How it fits
+
+```mermaid
+flowchart LR
+  T([Tenant order]) --> O[OSAC<br/>fulfillment + operator]
+  O -- "one automation job<br/>per operation" --> R[Contract role<br/>kypuros.fabric.manager<br/>20 tasks]
+  R -- "HTTPS / JSON<br/>bearer token" --> A[Fabric manager<br/>API v1]
+  A --> M[Reference backend<br/>emulated EVPN/VXLAN fabric]
+  A -.-> V[Your backend<br/>your switches, DPUs, array]
+  C[[Conformance suites<br/>+ 11 probes]] -. drive .-> O
+  C -. read .-> M
 ```
-  OSAC (hub)  ──network contract (OSAC-1433, Ansible role, 20 tasks)──▶  contract/     (vendor-neutral)
-                                                                            │ HTTP/JSON
-                                                                            ▼
-                                                                       backends/     (the vendor part)
-                                                                         mimic/      one box: containerlab FRR fabric, DPU containers, SNAP via NVMe/TCP
-                                                                         <oem>/      real switches + real DPUs (not written yet)
-  shims/        temporary workarounds for OSAC bugs, each tied to an upstream issue, deleted when fixed
-  conformance/  Suite BM and Suite CL: end-to-end through OSAC's API, a check at every hop, leak check at the end
+
+| Layer | Where | What it is |
+|---|---|---|
+| Contract role | [`contract/`](contract/collection) | OSAC's twenty network operations as Ansible tasks; each is one or two API calls |
+| API v1 | [`docs/api.md`](docs/api.md) | Fourteen object kinds: VPCs, subnets, ACLs, ports, attachments, pools, external IPs, NAT, NAT gateways, load balancers, volumes, volume attachments, CoS policies, fabric domains |
+| Reference backend | [`backends/mimic/`](backends/mimic) | One process serving API v1 against a fabric emulated on one machine: FRRouting containers for the border, spines, leaves and DPUs |
+| Conformance | [`conformance/`](conformance) | Suite BM (bare metal, 41 steps), Suite CL (hosted cluster, 36 steps), the probe interface |
+| Vendor guide | [`vendors/`](vendors/readme.md) | How to bring real equipment: each API object as an obligation on your gear, and the order of proof |
+
+## Try it in a minute
+
+The API's semantics can be checked with no devices and no OSAC. This starts the reference backend in dry-run
+mode, plays a full cluster-order sequence through it, and verifies creation, idempotent re-puts, pending then
+ready, dependency refusal, cascade and clean deletion:
+
+```bash
+git clone https://github.com/dkypuros/osac-fabric-manager.git
+cd osac-fabric-manager/backends/mimic/fabd
+python3 dryrun_v1.py        # needs only Python 3; ends with "PASS: 0 failed checks"
 ```
-Details: [docs/architecture.md](docs/architecture.md), [docs/contract.md](docs/contract.md),
-[docs/backends.md](docs/backends.md), [docs/shims.md](docs/shims.md), [docs/conformance.md](docs/conformance.md),
-[docs/from-scratch.md](docs/from-scratch.md), [docs/conformance-harness.md](docs/conformance-harness.md), and the northbound API v1 in the Netris vocabulary, DPU-centric, which the
-contract role calls and both suites have passed on: [docs/api.md](docs/api.md); how it is built:
-[docs/api-implementation.md](docs/api-implementation.md). Sequence diagrams with the boundaries drawn:
-[docs/sequence-diagrams.pdf](docs/sequence-diagrams.pdf).
 
-## Layout
-| Path | What |
+Point the same harness at your own backend with `--target <url> --token <token>`
+([docs/conformance-harness.md](docs/conformance-harness.md)).
+
+## Bring your own equipment
+
+1. Read [`docs/api.md`](docs/api.md): what must be true on the equipment when each object is `Ready`.
+2. Write a backend that serves API v1 against your switches, DPUs, border and storage. The reference backend in
+   [`backends/mimic/fabd/fabd.py`](backends/mimic/fabd/fabd.py) is the worked example.
+3. Pass the semantic harness in dry run. It takes seconds per iteration.
+4. Fill in the eleven probes in [`conformance/common/probes.py`](conformance/common/probes.py) so the suites can
+   read your equipment.
+5. Register your fabric manager with OSAC ([`config/hub/`](config/hub)) and run Suite BM, then Suite CL, three
+   unattended passes each.
+
+[`vendors/readme.md`](vendors/readme.md) walks through it; [`vendors/dell/`](vendors/dell/readme.md) is a worked
+example for BlueField-3, SONiC, iDRAC and PowerStore.
+
+## Status
+
+| | |
 |---|---|
-| `contract/collection/` | Ansible collection `kypuros.fabric` 1.0.3 (role `manager`): the twenty contract tasks, each one call to the backend's API v1; `tests/run-live.sh` runs the role inside the EE against a live backend |
-| `backends/mimic/fabd/` | `fabd.py`: the mimic backend (fabric agent) serving API v1; `dryrun-v1.sh`/`dryrun_v1.py` (46 checks, no device access), `smoke-v1.sh` (live), `leakcheck.sh`; `smoke.sh` for the original paths until they go |
-| `conformance/reports/` | the Suite CL reports of the three passes on API v1 (2026-11-07) |
-| `backends/mimic/fabric/` | the mimicked fabric: `gen.py` → containerlab topology + FRR configs, `host-up.sh`, DPU image |
-| `shims/janitor/` | `osac-cl-janitor.py`: automatic workarounds for OSAC bugs #6 and #9; `teardown-unstick.sh` one-shot |
-| `conformance/` | `common/` runner, component checks and the **probe interface** (`probes.py`; `probes_mimic.py` reference, `probes_dell.py` skeleton; `OSAC_PROBES=<name>`); `bm/` Suite BM; `cl/` Suite CL; `run3.sh` exit criteria |
-| `vendors/` | onboarding guides for real equipment: what a vendor inherits, the API objects as obligations on their gear, networks, probes, storage, how to glue in and test the bottom, the order of proof. [`vendors/dell/`](vendors/dell/readme.md) first |
-| `config/hub/` | the registration ConfigMap OSAC discovers the fabric manager by |
-| `config/host/` | backend config (`config.json`, `baseline.json`), systemd units |
+| **Proven** | On the reference backend with an emulated fabric (2026-11-07): Suite BM 3 × 41/41, Suite CL 3 × 36/36 unattended, leak checks clean. Reports with per-step timings are in [`conformance/reports/`](conformance/reports). |
+| **Automation** | Run under AWX, the upstream of Ansible Automation Platform's automation controller. |
+| **Not yet** | A backend for real hardware is not in this repository. The suites carry names and paths from the lab they were written in and need configuring before they run elsewhere. OSAC's own contract conformance tests have not been run against this manager. |
+| **Known OSAC issues** | A few upstream defects need workarounds, listed with their removal conditions in [`docs/shims.md`](docs/shims.md). |
 
-Lower-case file names throughout. No secrets in this repo (tokens live outside it, see `config/host/config.json` keys).
+## Documentation
 
-## Licence
+| Topic | Document |
+|---|---|
+| Architecture and the five isolation boundaries | [`docs/architecture.md`](docs/architecture.md), [`docs/sequence-diagrams.pdf`](docs/sequence-diagrams.pdf) |
+| The OSAC contract, operation by operation | [`docs/contract.md`](docs/contract.md) |
+| Northbound API v1 and how it is built | [`docs/api.md`](docs/api.md), [`docs/api-implementation.md`](docs/api-implementation.md) |
+| Backends | [`docs/backends.md`](docs/backends.md) |
+| Conformance suites, probes and the harness | [`docs/conformance.md`](docs/conformance.md), [`docs/conformance-harness.md`](docs/conformance-harness.md) |
+| Workarounds for upstream issues | [`docs/shims.md`](docs/shims.md) |
+| Building the emulated lab | [`docs/from-scratch.md`](docs/from-scratch.md) |
+| Names, and which are costly to change | [`docs/naming.md`](docs/naming.md) |
 
-Apache License 2.0; see [LICENSE](LICENSE).
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `contract/collection/` | Ansible collection `kypuros.fabric` (role `manager`); `tests/run-live.sh` runs the role against a live backend |
+| `backends/mimic/fabd/` | `fabd.py`, the reference backend; `dryrun_v1.py`, the semantic harness; `smoke-v1.sh`, a live single-tenant smoke test |
+| `backends/mimic/fabric/` | The emulated fabric: `gen.py` generates the containerlab topology and FRRouting configs |
+| `backends/mimic/container/` | A container image of the backend in dry-run mode, with an example site configuration |
+| `conformance/` | `bm/` and `cl/` suites, `common/` runner and probes, `reports/` |
+| `shims/` | Temporary workarounds for upstream OSAC issues, each tied to the issue that removes it |
+| `vendors/` | Onboarding guides for real equipment |
+| `config/` | The registration object OSAC discovers the fabric manager by; backend configuration and service units |
+
+No secrets are stored in this repository; tokens are read from files outside it.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
